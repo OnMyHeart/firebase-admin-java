@@ -1,3 +1,12 @@
+---
+name: Bug report
+about: Create a report to help us improve
+title: ''
+labels: ''
+assignees: ''
+
+---
+
 ### [READ] Step 1: Are you in the right place?
 
   * For issues or feature requests related to __the code in this repository__

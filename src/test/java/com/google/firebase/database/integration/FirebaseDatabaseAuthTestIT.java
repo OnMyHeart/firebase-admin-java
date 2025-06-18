@@ -16,7 +16,6 @@
 
 package com.google.firebase.database.integration;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.google.api.core.ApiFutureCallback;
@@ -33,8 +32,6 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.TestHelpers;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.testing.IntegrationTestUtils;
-import com.google.firebase.testing.IntegrationTestUtils.AppHttpClient;
-import com.google.firebase.testing.IntegrationTestUtils.ResponseInfo;
 import com.google.firebase.testing.ServiceAccount;
 import com.google.firebase.testing.TestUtils;
 import java.io.IOException;
@@ -49,11 +46,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class FirebaseDatabaseAuthTestIT {
-  
+
   private static FirebaseApp masterApp;
-  
+
   @BeforeClass
-  public static void setUpClass() throws IOException {    
+  public static void setUpClass() throws IOException {
     masterApp = IntegrationTestUtils.ensureDefaultApp();
     setDatabaseRules();
   }
@@ -74,11 +71,11 @@ public class FirebaseDatabaseAuthTestIT {
     assertWriteSucceeds(db.getReference());
     assertReadSucceeds(db.getReference());
   }
-  
+
   @Test
   public void testAuthWithInvalidCertificateCredential() throws InterruptedException, IOException {
     FirebaseOptions options =
-        new FirebaseOptions.Builder()
+        FirebaseOptions.builder()
             .setDatabaseUrl(IntegrationTestUtils.getDatabaseUrl())
             .setCredentials(GoogleCredentials.fromStream(ServiceAccount.NONE.asStream()))
             .build();
@@ -87,17 +84,16 @@ public class FirebaseDatabaseAuthTestIT {
     // TODO: Ideally, we would find a way to verify the correct log output.
     assertWriteTimeout(db.getReference());
   }
-  
+
   @Test
   public void testDatabaseAuthVariablesAuthorization() throws InterruptedException {
     Map<String, Object> authVariableOverrides = ImmutableMap.<String, Object>of(
         "uid", "test",
         "custom", "secret"
     );
-    FirebaseOptions options =
-        new FirebaseOptions.Builder(masterApp.getOptions())
-            .setDatabaseAuthVariableOverride(authVariableOverrides)
-            .build();
+    FirebaseOptions options = masterApp.getOptions().toBuilder()
+        .setDatabaseAuthVariableOverride(authVariableOverrides)
+        .build();
     FirebaseApp testUidApp = FirebaseApp.initializeApp(options, "testGetAppWithUid");
     FirebaseDatabase masterDb = FirebaseDatabase.getInstance(masterApp);
     FirebaseDatabase testAuthOverridesDb = FirebaseDatabase.getInstance(testUidApp);
@@ -111,13 +107,12 @@ public class FirebaseDatabaseAuthTestIT {
     assertWriteSucceeds(testAuthOverridesDb.getReference("test-custom-field-only"));
     assertReadSucceeds(testAuthOverridesDb.getReference("test-custom-field-only"));
   }
-  
+
   @Test
   public void testDatabaseAuthVariablesNoAuthorization() throws InterruptedException {
-    FirebaseOptions options =
-        new FirebaseOptions.Builder(masterApp.getOptions())
-            .setDatabaseAuthVariableOverride(null)
-            .build();
+    FirebaseOptions options = masterApp.getOptions().toBuilder()
+        .setDatabaseAuthVariableOverride(null)
+        .build();
     FirebaseApp testUidApp =
         FirebaseApp.initializeApp(options, "testServiceAccountDatabaseWithNoAuth");
 
@@ -130,25 +125,25 @@ public class FirebaseDatabaseAuthTestIT {
     assertReadFails(testAuthOverridesDb.getReference("test-uid-only"));
     assertWriteFails(testAuthOverridesDb.getReference("test-custom-field-only"));
     assertReadFails(testAuthOverridesDb.getReference("test-custom-field-only"));
-    assertWriteSucceeds(testAuthOverridesDb.getReference("test-noauth-only"));    
+    assertWriteSucceeds(testAuthOverridesDb.getReference("test-noauth-only"));
   }
-  
+
   private static void assertWriteSucceeds(DatabaseReference ref) throws InterruptedException {
     doWrite(ref, /*shouldSucceed=*/ true, /*shouldTimeout=*/ false);
   }
-  
+
   private static void assertWriteFails(DatabaseReference ref) throws InterruptedException {
     doWrite(ref, /*shouldSucceed=*/ false, /*shouldTimeout=*/ false);
   }
-  
+
   private static void assertWriteTimeout(DatabaseReference ref) throws InterruptedException {
     doWrite(ref, /*shouldSucceed=*/ false, /*shouldTimeout=*/ true);
   }
-  
+
   private static void assertReadSucceeds(DatabaseReference ref) throws InterruptedException {
     doRead(ref, /*shouldSucceed=*/ true, /*shouldTimeout=*/ false);
   }
-  
+
   private static void assertReadFails(DatabaseReference ref) throws InterruptedException {
     doRead(ref, /*shouldSucceed=*/ false, /*shouldTimeout=*/ false);
   }
@@ -182,7 +177,7 @@ public class FirebaseDatabaseAuthTestIT {
       assertTrue("Write successful (expected to fail).", !success.get());
     }
   }
-  
+
   private static void doRead(
       DatabaseReference ref, final boolean shouldSucceed, final boolean shouldTimeout)
       throws InterruptedException {
@@ -213,9 +208,9 @@ public class FirebaseDatabaseAuthTestIT {
       assertTrue("Read successful (expected to fail).", !success.get());
     }
   }
-  
+
   private static void setDatabaseRules() throws IOException {
-    // TODO: Use more than uid in rule Set rules so the only allowed operation is writing to 
+    // TODO: Use more than uid in rule Set rules so the only allowed operation is writing to
     // /test-uid-only by user with uid 'test'.
     String rules =
         "{\n"
@@ -234,8 +229,7 @@ public class FirebaseDatabaseAuthTestIT {
             + "  }\n"
             + "}";
 
-    AppHttpClient client = new AppHttpClient();
-    ResponseInfo info = client.put("/.settings/rules.json", rules);
-    assertEquals(200, info.getStatus());
+    RulesClient client = new RulesClient();
+    client.updateRules(rules);
   }
 }

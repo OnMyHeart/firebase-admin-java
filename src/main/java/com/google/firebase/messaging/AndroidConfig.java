@@ -51,6 +51,9 @@ public class AndroidConfig {
 
   @Key("fcm_options")
   private final AndroidFcmOptions fcmOptions;
+  
+  @Key("direct_boot_ok")
+  private final Boolean directBootOk;
 
   private AndroidConfig(Builder builder) {
     this.collapseKey = builder.collapseKey;
@@ -75,6 +78,7 @@ public class AndroidConfig {
     this.data = builder.data.isEmpty() ? null : ImmutableMap.copyOf(builder.data);
     this.notification = builder.notification;
     this.fcmOptions = builder.fcmOptions;
+    this.directBootOk = builder.directBootOk;
   }
 
   /**
@@ -103,13 +107,17 @@ public class AndroidConfig {
     private final Map<String, String> data = new HashMap<>();
     private AndroidNotification notification;
     private AndroidFcmOptions fcmOptions;
+    private Boolean directBootOk;
 
     private Builder() {}
 
     /**
-     * Sets a collapse key for the message. Collapse key serves as an identifier for a group of
+     * Sets a collapse key for the message. The collapse key serves as an identifier for a group of
      * messages that can be collapsed, so that only the last message gets sent when delivery can be
      * resumed. A maximum of 4 different collapse keys may be active at any given time.
+     * 
+     * <p>By default, the collapse key is the app package name registered in
+     * the Firebase console.</p>
      *
      * @param collapseKey A collapse key string.
      * @return This builder.
@@ -193,11 +201,20 @@ public class AndroidConfig {
     }
 
     /**
-     * Sets the {@link AndroidFcmOptions}, which will override values set in the {@link FcmOptions}
+     * Sets the {@link AndroidFcmOptions}, which overrides values set in the {@link FcmOptions}
      * for Android messages.
      */
     public Builder setFcmOptions(AndroidFcmOptions androidFcmOptions) {
       this.fcmOptions = androidFcmOptions;
+      return this;
+    }
+
+    /**
+     * Sets the {@code direct_boot_ok} flag. If set to true, messages are delivered to 
+     * the app while the device is in direct boot mode.
+     */
+    public Builder setDirectBootOk(boolean directBootOk) {
+      this.directBootOk = directBootOk;
       return this;
     }
 

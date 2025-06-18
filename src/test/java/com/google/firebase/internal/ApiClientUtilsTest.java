@@ -25,6 +25,7 @@ import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
@@ -66,7 +67,20 @@ public class ApiClientUtilsTest {
     assertEquals(4, retryConfig.getMaxRetries());
     assertEquals(60 * 1000, retryConfig.getMaxIntervalMillis());
     assertFalse(retryConfig.isRetryOnIOExceptions());
-    assertEquals(retryConfig.getRetryStatusCodes(), ImmutableList.of(500, 503));
+    assertEquals(retryConfig.getRetryStatusCodes(), ImmutableList.of(503));
+  }
+
+  @Test
+  public void testAuthorizedHttpClientWithoutRetry() throws IOException {
+    FirebaseApp app = FirebaseApp.initializeApp(TEST_OPTIONS);
+
+    HttpRequestFactory requestFactory = ApiClientUtils.newAuthorizedRequestFactory(app, null);
+
+    assertTrue(requestFactory.getInitializer() instanceof FirebaseRequestInitializer);
+    HttpRequest request = requestFactory.buildGetRequest(TEST_URL);
+    assertEquals("Bearer test-token", request.getHeaders().getAuthorization());
+    HttpUnsuccessfulResponseHandler retryHandler = request.getUnsuccessfulResponseHandler();
+    assertFalse(retryHandler instanceof RetryHandlerDecorator);
   }
 
   @Test
@@ -115,4 +129,12 @@ public class ApiClientUtilsTest {
 
     assertTrue(lowLevelResponse.isDisconnected());
   }
+
+  @Test
+  public void testVerifyDefaultTransportReused() {
+    HttpTransport t1 = ApiClientUtils.getDefaultTransport();
+    HttpTransport t2 = ApiClientUtils.getDefaultTransport();
+    assertEquals(t1, t2);
+  }
+
 }

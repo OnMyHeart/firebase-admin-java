@@ -66,7 +66,7 @@ public class RulesTestIT {
       MapBuilder.of("rules", MapBuilder.of(".read", "auth != null", ".write", "auth != null"));
 
   private static final Map<String, Object> testRules;
-  
+
   static {
     testRules = new MapBuilder()
         .put("read_only", MapBuilder.of(".read", true))
@@ -103,7 +103,7 @@ public class RulesTestIT {
   public static void setUpClass() throws IOException {
     // Init app with non-admin privileges
     Map<String, Object> auth = MapBuilder.of("uid", "my-service-worker");
-    FirebaseOptions options = new FirebaseOptions.Builder()
+    FirebaseOptions options = FirebaseOptions.builder()
         .setCredentials(GoogleCredentials.fromStream(
             IntegrationTestUtils.getServiceAccountCertificate()))
         .setDatabaseUrl(IntegrationTestUtils.getDatabaseUrl())
@@ -137,9 +137,8 @@ public class RulesTestIT {
   }
 
   private static void uploadRules(String rules) throws IOException {
-    IntegrationTestUtils.AppHttpClient client = new IntegrationTestUtils.AppHttpClient(masterApp);
-    IntegrationTestUtils.ResponseInfo response = client.put("/.settings/rules.json", rules);
-    assertEquals(200, response.getStatus());
+    RulesClient client = new RulesClient(masterApp);
+    client.updateRules(rules);
   }
 
   @Test

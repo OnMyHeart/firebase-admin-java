@@ -25,15 +25,13 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.JsonParser;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.firebase.internal.ApiClientUtils;
 import com.google.firebase.messaging.AndroidConfig.Priority;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
@@ -94,7 +92,10 @@ public class MessageTest {
   @Test
   public void testNotificationMessageDeprecatedConstructor() throws IOException {
     Message message = Message.builder()
-        .setNotification(new Notification("title", "body"))
+        .setNotification(Notification.builder()
+            .setTitle("title")
+            .setBody("body")
+            .build())
         .setTopic("test-topic")
         .build();
     Map<String, String> data = ImmutableMap.of("title", "title", "body", "body");
@@ -186,7 +187,7 @@ public class MessageTest {
         .put("body_loc_args", ImmutableList.of("body-arg1", "body-arg2", "body-arg3"))
         .put("channel_id", "channel-id")
         // There is a problem with the JsonParser assignment to BigDecimal takes priority over
-        // all other number types and so this integer value is interpreted as a BigDecimal 
+        // all other number types and so this integer value is interpreted as a BigDecimal
         // rather than an Integer.
         .put("notification_count", BigDecimal.valueOf(4L))
         .build();
@@ -200,11 +201,34 @@ public class MessageTest {
     assertJsonEquals(ImmutableMap.of("topic", "test-topic", "android", data), message);
   }
 
+  @Test
+  public void testAndroidMessageWithDirectBootOk() throws IOException {
+    Message message = Message.builder()
+        .setAndroidConfig(AndroidConfig.builder()
+            .setDirectBootOk(true)
+            .setNotification(AndroidNotification.builder()
+                .setTitle("android-title")
+                .setBody("android-body")
+                .build())
+            .build())
+        .setTopic("test-topic")
+        .build();
+    Map<String, Object> notification = ImmutableMap.<String, Object>builder()
+        .put("title", "android-title")
+        .put("body", "android-body")
+        .build();
+    Map<String, Object> data = ImmutableMap.of(
+        "direct_boot_ok", true,
+        "notification", notification
+    );
+    assertJsonEquals(ImmutableMap.of("topic", "test-topic", "android", data), message);
+  }
+
   @Test(expected = IllegalArgumentException.class)
   public void testAndroidNotificationWithNegativeCount() throws IllegalArgumentException {
     AndroidNotification.builder().setNotificationCount(-1).build();
   }
-  
+
   @Test
   public void testAndroidMessageWithoutLocalization() throws IOException {
     Message message = Message.builder()
@@ -387,6 +411,7 @@ public class MessageTest {
             .putCustomData("cd1", "cd-v1")
             .putAllCustomData(ImmutableMap.<String, Object>of("cd2", "cd-v2", "cd3", true))
             .setAps(Aps.builder().build())
+            .setLiveActivityToken("test-live-activity-token")
             .build())
         .setTopic("test-topic")
         .build();
@@ -397,10 +422,11 @@ public class MessageTest {
         .put("cd3", true)
         .put("aps", ImmutableMap.of())
         .build();
-    Map<String, Object> data = ImmutableMap.<String, Object>of(
-        "headers", ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3"),
-        "payload", payload
-    );
+    Map<String, Object> data = ImmutableMap.<String, Object>builder()
+        .put("headers", ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3"))
+        .put("payload", payload)
+        .put("live_activity_token", "test-live-activity-token")
+        .build();
     assertJsonEquals(ImmutableMap.of("topic", "test-topic", "apns", data), message);
   }
 
@@ -418,6 +444,7 @@ public class MessageTest {
                 .setSound("test-sound")
                 .setThreadId("test-thread-id")
                 .build())
+            .setLiveActivityToken("test-live-activity-token-aps")
             .build())
         .setTopic("test-topic")
         .build();
@@ -435,7 +462,10 @@ public class MessageTest {
     assertJsonEquals(
         ImmutableMap.of(
             "topic", "test-topic",
-            "apns", ImmutableMap.<String, Object>of("payload", payload)),
+            "apns", ImmutableMap.<String, Object>builder()
+                .put("payload", payload)
+                .put("live_activity_token", "test-live-activity-token-aps")
+                .build()),
         message);
 
     message = Message.builder()
@@ -729,7 +759,11 @@ public class MessageTest {
   @Test
   public void testImageInNotificationDeprecatedConstructor() throws IOException {
     Message message = Message.builder()
-        .setNotification(new Notification("title", "body", TEST_IMAGE_URL))
+        .setNotification(Notification.builder()
+            .setTitle("title")
+            .setBody("body")
+            .setImage(TEST_IMAGE_URL)
+            .build())
         .setTopic("test-topic")
         .build();
     Map<String, String> data = ImmutableMap.of(
@@ -755,7 +789,11 @@ public class MessageTest {
   @Test
   public void testImageInAndroidNotification() throws IOException {
     Message message = Message.builder()
-        .setNotification(new Notification("title", "body", TEST_IMAGE_URL))
+        .setNotification(Notification.builder()
+            .setTitle("title")
+            .setBody("body")
+            .setImage(TEST_IMAGE_URL)
+            .build())
         .setAndroidConfig(AndroidConfig.builder()
             .setNotification(AndroidNotification.builder()
                 .setTitle("android-title")
@@ -785,10 +823,15 @@ public class MessageTest {
   public void testImageInApnsNotification() throws IOException {
     Message message = Message.builder()
         .setTopic("test-topic")
-        .setNotification(new Notification("title", "body", TEST_IMAGE_URL))
+        .setNotification(Notification.builder()
+            .setTitle("title")
+            .setBody("body")
+            .setImage(TEST_IMAGE_URL)
+            .build())
         .setApnsConfig(
             ApnsConfig.builder().setAps(Aps.builder().build())
                 .setFcmOptions(ApnsFcmOptions.builder().setImage(TEST_IMAGE_URL_APNS).build())
+                .setLiveActivityToken("test-live-activity-token-image")
                 .build()).build();
 
     ImmutableMap<String, Object> notification =
@@ -801,6 +844,7 @@ public class MessageTest {
         ImmutableMap.<String, Object>builder()
             .put("fcm_options", ImmutableMap.of("image", TEST_IMAGE_URL_APNS))
             .put("payload", ImmutableMap.of("aps", ImmutableMap.of()))
+            .put("live_activity_token", "test-live-activity-token-image")
             .build();
     ImmutableMap<String, Object> expected =
         ImmutableMap.<String, Object>builder()
@@ -812,7 +856,35 @@ public class MessageTest {
   }
 
   @Test
-  public void testInvalidColorInAndroidNotificationLightSettings() throws IOException {
+  public void testApnsMessageWithOnlyLiveActivityToken() throws IOException {
+    Message message = Message.builder()
+        .setApnsConfig(ApnsConfig.builder()
+            .setAps(Aps.builder().build())
+            .setLiveActivityToken("only-live-activity")
+            .build())
+        .setTopic("test-topic")
+        .build();
+    Map<String, Object> expectedApns = ImmutableMap.<String, Object>builder()
+        .put("live_activity_token", "only-live-activity")
+        .put("payload", ImmutableMap.of("aps", ImmutableMap.of()))
+        .build();
+    assertJsonEquals(ImmutableMap.of("topic", "test-topic", "apns", expectedApns), message);
+
+    // Test without live activity token
+    message = Message.builder()
+        .setApnsConfig(ApnsConfig.builder()
+            .setAps(Aps.builder().build())
+            .build())
+        .setTopic("test-topic")
+        .build();
+    expectedApns = ImmutableMap.<String, Object>builder()
+        .put("payload", ImmutableMap.of("aps", ImmutableMap.of()))
+        .build();
+    assertJsonEquals(ImmutableMap.of("topic", "test-topic", "apns", expectedApns), message);
+  }
+
+  @Test
+  public void testInvalidColorInAndroidNotificationLightSettings() {
     try {
       LightSettings.Builder lightSettingsBuilder = LightSettings.builder()
                       .setColorFromString("#01020K")
@@ -830,7 +902,10 @@ public class MessageTest {
   public void testExtendedAndroidNotificationParameters() throws IOException {
     long[] vibrateTimings = {1000L, 1001L};
     Message message = Message.builder()
-        .setNotification(new Notification("title", "body"))
+        .setNotification(Notification.builder()
+            .setTitle("title")
+            .setBody("body")
+            .build())
         .setAndroidConfig(AndroidConfig.builder()
             .setNotification(AndroidNotification.builder()
                 .setTitle("android-title")
@@ -851,6 +926,7 @@ public class MessageTest {
                 .setDefaultLightSettings(false)
                 .setVisibility(AndroidNotification.Visibility.PUBLIC)
                 .setNotificationCount(10)
+                .setProxy(AndroidNotification.Proxy.DENY)
                 .build())
             .build())
         .setTopic("test-topic")
@@ -884,6 +960,7 @@ public class MessageTest {
             .put("default_light_settings", false)
             .put("visibility", "public")
             .put("notification_count", new BigDecimal(10))
+            .put("proxy", "DENY")
             .build())
         .build();
     assertJsonEquals(ImmutableMap.of(
@@ -896,7 +973,7 @@ public class MessageTest {
   }
 
   private static Map<String, Object> toMap(Object object) throws IOException {
-    JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
+    JsonFactory jsonFactory = ApiClientUtils.getDefaultJsonFactory();
     String json = jsonFactory.toString(object);
     JsonParser parser = jsonFactory.createJsonParser(json);
     Map<String, Object> map = new HashMap<>();

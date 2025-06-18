@@ -31,6 +31,7 @@ import com.google.common.collect.Iterables;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.TestOnlyImplFirebaseTrampolines;
+import com.google.firebase.internal.FirebaseProcessEnvironment;
 import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
@@ -41,12 +42,14 @@ public class FirebaseTokenUtilsTest {
   private static final Clock CLOCK = new FixedClock(2002000L * 1000);
   private static final String TEST_PROJECT_ID = "test-project-id";
   private static final GoogleCredentials MOCK_CREDENTIALS = GoogleCredentials.create(null);
+  private static final String AUTH_EMULATOR = "localhost:9099";
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
   @After
   public void tearDown() {
+    FirebaseProcessEnvironment.clearCache();
     TestOnlyImplFirebaseTrampolines.clearInstancesForTest();
   }
 
@@ -57,8 +60,8 @@ public class FirebaseTokenUtilsTest {
         .setProjectId(TEST_PROJECT_ID)
         .build());
 
-    FirebaseTokenVerifierImpl idTokenVerifier = FirebaseTokenUtils.createIdTokenVerifier(
-        app, CLOCK);
+    FirebaseTokenVerifierImpl idTokenVerifier =
+        FirebaseTokenUtils.createIdTokenVerifier(app, CLOCK);
 
     assertEquals("verifyIdToken()", idTokenVerifier.getMethod());
     assertEquals("ID token", idTokenVerifier.getShortName());
@@ -69,6 +72,25 @@ public class FirebaseTokenUtilsTest {
         "https://www.googleapis.com/robot/v1/metadata/x509/"
             + "securetoken@system.gserviceaccount.com");
     verifyJwtVerifier(idTokenVerifier.getIdTokenVerifier(),
+        "https://securetoken.google.com/test-project-id");
+  }
+
+  @Test
+  public void testCreateIdTokenVerifierForEmulator() {
+    FirebaseProcessEnvironment.setenv("FIREBASE_AUTH_EMULATOR_HOST", AUTH_EMULATOR);
+    FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder()
+        .setCredentials(MOCK_CREDENTIALS)
+        .setProjectId(TEST_PROJECT_ID)
+        .build());
+
+    FirebaseTokenVerifierImpl emulatorVerifier =
+        FirebaseTokenUtils.createIdTokenVerifier(app, CLOCK);
+
+    assertEquals("ID token", emulatorVerifier.getShortName());
+    assertEquals("an ID token", emulatorVerifier.getArticledShortName());
+    assertEquals("https://firebase.google.com/docs/auth/admin/verify-id-tokens",
+        emulatorVerifier.getDocUrl());
+    verifyJwtVerifier(emulatorVerifier.getIdTokenVerifier(),
         "https://securetoken.google.com/test-project-id");
   }
 
@@ -89,8 +111,8 @@ public class FirebaseTokenUtilsTest {
         .setProjectId(TEST_PROJECT_ID)
         .build());
 
-    FirebaseTokenVerifierImpl cookieVerifier = FirebaseTokenUtils.createSessionCookieVerifier(
-        app, CLOCK);
+    FirebaseTokenVerifierImpl cookieVerifier =
+        FirebaseTokenUtils.createSessionCookieVerifier(app, CLOCK);
 
     assertEquals("verifySessionCookie()", cookieVerifier.getMethod());
     assertEquals("session cookie", cookieVerifier.getShortName());
@@ -100,6 +122,25 @@ public class FirebaseTokenUtilsTest {
     verifyPublicKeysManager(cookieVerifier.getPublicKeysManager(),
         "https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys");
     verifyJwtVerifier(cookieVerifier.getIdTokenVerifier(),
+        "https://session.firebase.google.com/test-project-id");
+  }
+
+  @Test
+  public void testSessionCookieVerifierForEmulator() {
+    FirebaseProcessEnvironment.setenv("FIREBASE_AUTH_EMULATOR_HOST", AUTH_EMULATOR);
+    FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder()
+        .setCredentials(MOCK_CREDENTIALS)
+        .setProjectId(TEST_PROJECT_ID)
+        .build());
+
+    FirebaseTokenVerifierImpl emulatorCookieVerifier =
+        FirebaseTokenUtils.createSessionCookieVerifier(app, CLOCK);
+
+    assertEquals("session cookie", emulatorCookieVerifier.getShortName());
+    assertEquals("a session cookie", emulatorCookieVerifier.getArticledShortName());
+    assertEquals("https://firebase.google.com/docs/auth/admin/manage-cookies",
+        emulatorCookieVerifier.getDocUrl());
+    verifyJwtVerifier(emulatorCookieVerifier.getIdTokenVerifier(),
         "https://session.firebase.google.com/test-project-id");
   }
 

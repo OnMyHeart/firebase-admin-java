@@ -25,26 +25,26 @@ import static org.junit.Assert.fail;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.TestOnlyImplFirebaseTrampolines;
 import com.google.firebase.database.util.EmulatorHelper;
+import com.google.firebase.internal.FirebaseProcessEnvironment;
 import com.google.firebase.testing.ServiceAccount;
 import com.google.firebase.testing.TestUtils;
+import java.io.IOException;
 import java.util.List;
 import org.junit.Test;
 
 public class FirebaseDatabaseTest {
-  
+
   private static final FirebaseOptions firebaseOptions =
-      new FirebaseOptions.Builder()
+      FirebaseOptions.builder()
           .setCredentials(TestUtils.getCertCredential(ServiceAccount.EDITOR.asStream()))
           .setDatabaseUrl("https://firebase-db-test.firebaseio.com")
           .build();
   private static final FirebaseOptions firebaseOptionsWithoutDatabaseUrl =
-      new FirebaseOptions.Builder()
+      FirebaseOptions.builder()
           .setCredentials(TestUtils.getCertCredential(ServiceAccount.EDITOR.asStream()))
           .build();
 
@@ -198,7 +198,7 @@ public class FirebaseDatabaseTest {
   }
 
   @Test
-  public void testDbUrlIsEmulatorUrlWhenSettingOptionsManually() {
+  public void testDbUrlIsEmulatorUrlWhenSettingOptionsManually() throws IOException {
 
     List<CustomTestCase> testCases = ImmutableList.of(
         // cases where the env var is ignored because the supplied DB URL is a valid emulator URL
@@ -218,9 +218,9 @@ public class FirebaseDatabaseTest {
     for (CustomTestCase tc : testCases) {
       try {
         FirebaseApp app = FirebaseApp.initializeApp(firebaseOptionsWithoutDatabaseUrl);
-        TestUtils.setEnvironmentVariables(
-            ImmutableMap.of(EmulatorHelper.FIREBASE_RTDB_EMULATOR_HOST_ENV_VAR,
-                Strings.nullToEmpty(tc.envVariableUrl)));
+        FirebaseProcessEnvironment.setenv(
+            EmulatorHelper.FIREBASE_RTDB_EMULATOR_HOST_ENV_VAR,
+            Strings.nullToEmpty(tc.envVariableUrl));
         FirebaseDatabase instance = FirebaseDatabase.getInstance(app, tc.rootDbUrl);
         assertEquals(tc.expectedEmulatorRootUrl,
             instance.getReference().repo.getRepoInfo().toString());
@@ -228,14 +228,13 @@ public class FirebaseDatabaseTest {
         // clean up after
         app.delete();
       } finally {
-        TestUtils.unsetEnvironmentVariables(
-            ImmutableSet.of(EmulatorHelper.FIREBASE_RTDB_EMULATOR_HOST_ENV_VAR));
+        FirebaseProcessEnvironment.clearCache();
       }
     }
   }
 
   @Test
-  public void testDbUrlIsEmulatorUrlForDbRefWithPath() {
+  public void testDbUrlIsEmulatorUrlForDbRefWithPath() throws IOException {
 
     List<CustomTestCase> testCases = ImmutableList.of(
         new CustomTestCase("http://my-custom-hosted-emulator.com:80?ns=dummy-ns",
@@ -255,9 +254,9 @@ public class FirebaseDatabaseTest {
     for (CustomTestCase tc : testCases) {
       try {
         FirebaseApp app = FirebaseApp.initializeApp(firebaseOptionsWithoutDatabaseUrl);
-        TestUtils.setEnvironmentVariables(
-            ImmutableMap.of(EmulatorHelper.FIREBASE_RTDB_EMULATOR_HOST_ENV_VAR,
-                Strings.nullToEmpty(tc.envVariableUrl)));
+        FirebaseProcessEnvironment.setenv(
+            EmulatorHelper.FIREBASE_RTDB_EMULATOR_HOST_ENV_VAR,
+            Strings.nullToEmpty(tc.envVariableUrl));
         FirebaseDatabase instance = FirebaseDatabase.getInstance(app, tc.rootDbUrl);
         DatabaseReference dbRef = instance.getReferenceFromUrl(tc.pathUrl);
         assertEquals(tc.expectedEmulatorRootUrl, dbRef.repo.getRepoInfo().toString());
@@ -267,8 +266,7 @@ public class FirebaseDatabaseTest {
         app.delete();
 
       } finally {
-        TestUtils.unsetEnvironmentVariables(
-            ImmutableSet.of(EmulatorHelper.FIREBASE_RTDB_EMULATOR_HOST_ENV_VAR));
+        FirebaseProcessEnvironment.clearCache();
       }
     }
   }

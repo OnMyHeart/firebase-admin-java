@@ -22,10 +22,13 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.api.client.http.HttpResponseException;
 import com.google.common.collect.ImmutableList;
+import com.google.firebase.ErrorCode;
 import com.google.firebase.testing.IntegrationTestUtils;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -60,6 +63,7 @@ public class FirebaseMessagingIT {
                     .setBody("Body")
                     .build())
                 .build())
+            .setLiveActivityToken("integration-test-live-activity-token")
             .build())
         .setWebpushConfig(WebpushConfig.builder()
             .putHeader("X-Custom-Val", "Foo")
@@ -73,25 +77,55 @@ public class FirebaseMessagingIT {
   }
 
   @Test
-  public void testSendAll() throws Exception {
+  public void testSendError() throws InterruptedException {
+    FirebaseMessaging messaging = FirebaseMessaging.getInstance();
+    Message message = Message.builder()
+        .setNotification(Notification.builder()
+            .setTitle("Title")
+            .setBody("Body")
+            .build())
+        .setToken("not-a-token")
+        .build();
+    try {
+      messaging.sendAsync(message, true).get();
+    } catch (ExecutionException e) {
+      FirebaseMessagingException cause = (FirebaseMessagingException) e.getCause();
+      assertEquals(ErrorCode.INVALID_ARGUMENT, cause.getErrorCode());
+      assertEquals(MessagingErrorCode.INVALID_ARGUMENT, cause.getMessagingErrorCode());
+      assertNotNull(cause.getHttpResponse());
+      assertTrue(cause.getCause() instanceof HttpResponseException);
+    }
+  }
+
+  @Test
+  public void testSendEach() throws Exception {
     List<Message> messages = new ArrayList<>();
     messages.add(
         Message.builder()
-          .setNotification(new Notification("Title", "Body"))
+          .setNotification(Notification.builder()
+              .setTitle("Title")
+              .setBody("Body")
+              .build())
           .setTopic("foo-bar")
           .build());
     messages.add(
         Message.builder()
-          .setNotification(new Notification("Title", "Body"))
+          .setNotification(Notification.builder()
+              .setTitle("Title")
+              .setBody("Body")
+              .build())
           .setTopic("foo-bar")
           .build());
     messages.add(
         Message.builder()
-          .setNotification(new Notification("Title", "Body"))
+          .setNotification(Notification.builder()
+              .setTitle("Title")
+              .setBody("Body")
+              .build())
           .setToken("not-a-token")
           .build());
 
-    BatchResponse response = FirebaseMessaging.getInstance().sendAll(messages, true);
+    BatchResponse response = FirebaseMessaging.getInstance().sendEach(messages, true);
 
     assertEquals(2, response.getSuccessCount());
     assertEquals(1, response.getFailureCount());
@@ -110,17 +144,17 @@ public class FirebaseMessagingIT {
     assertNull(responses.get(2).getMessageId());
     FirebaseMessagingException exception = responses.get(2).getException();
     assertNotNull(exception);
-    assertEquals("invalid-argument", exception.getErrorCode());
+    assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
   }
 
   @Test
-  public void testSendFiveHundred() throws Exception {
+  public void testSendFiveHundredWithSendEach() throws Exception {
     List<Message> messages = new ArrayList<>();
     for (int i = 0; i < 500; i++) {
       messages.add(Message.builder().setTopic("foo-bar-" + (i % 10)).build());
     }
 
-    BatchResponse response = FirebaseMessaging.getInstance().sendAll(messages, true);
+    BatchResponse response = FirebaseMessaging.getInstance().sendEach(messages, true);
 
     assertEquals(500, response.getResponses().size());
     assertEquals(500, response.getSuccessCount());
@@ -137,14 +171,17 @@ public class FirebaseMessagingIT {
   }
 
   @Test
-  public void testSendMulticast() throws Exception {
+  public void testSendEachForMulticast() throws Exception {
     MulticastMessage multicastMessage = MulticastMessage.builder()
-        .setNotification(new Notification("Title", "Body"))
+        .setNotification(Notification.builder()
+            .setTitle("Title")
+            .setBody("Body")
+            .build())
         .addToken("not-a-token")
         .addToken("also-not-a-token")
         .build();
 
-    BatchResponse response = FirebaseMessaging.getInstance().sendMulticast(
+    BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(
         multicastMessage, true);
 
     assertEquals(0, response.getSuccessCount());

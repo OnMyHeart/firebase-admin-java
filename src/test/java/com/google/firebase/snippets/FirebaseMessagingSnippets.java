@@ -88,9 +88,10 @@ public class FirebaseMessagingSnippets {
 
     // See documentation on defining a message payload.
     Message message = Message.builder()
-        .setNotification(new Notification(
-            "$GOOG up 1.43% on the day",
-            "$GOOG gained 11.80 points to close at 835.67, up 1.43% on the day."))
+        .setNotification(Notification.builder()
+            .setTitle("$GOOG up 1.43% on the day")
+            .setBody("$GOOG gained 11.80 points to close at 835.67, up 1.43% on the day.")
+            .build())
         .setCondition(condition)
         .build();
 
@@ -125,12 +126,18 @@ public class FirebaseMessagingSnippets {
     // Create a list containing up to 500 messages.
     List<Message> messages = Arrays.asList(
         Message.builder()
-            .setNotification(new Notification("Price drop", "5% off all electronics"))
+            .setNotification(Notification.builder()
+                .setTitle("Price drop")
+                .setBody("5% off all electronics")
+                .build())
             .setToken(registrationToken)
             .build(),
         // ...
         Message.builder()
-            .setNotification(new Notification("Price drop", "2% off all books"))
+            .setNotification(Notification.builder()
+                .setTitle("Price drop")
+                .setBody("2% off all books")
+                .build())
             .setTopic("readers-club")
             .build()
     );
@@ -142,9 +149,39 @@ public class FirebaseMessagingSnippets {
     // [END send_all]
   }
 
+  public void sendEach() throws FirebaseMessagingException {
+    String registrationToken = "YOUR_REGISTRATION_TOKEN";
+
+    // [START send_each]
+    // Create a list containing up to 500 messages.
+    List<Message> messages = Arrays.asList(
+        Message.builder()
+            .setNotification(Notification.builder()
+                .setTitle("Price drop")
+                .setBody("5% off all electronics")
+                .build())
+            .setToken(registrationToken)
+            .build(),
+        // ...
+        Message.builder()
+            .setNotification(Notification.builder()
+                .setTitle("Price drop")
+                .setBody("2% off all books")
+                .build())
+            .setTopic("readers-club")
+            .build()
+    );
+
+    BatchResponse response = FirebaseMessaging.getInstance().sendEach(messages);
+    // See the BatchResponse reference documentation
+    // for the contents of response.
+    System.out.println(response.getSuccessCount() + " messages were sent successfully");
+    // [END send_each]
+  }
+
   public void sendMulticast() throws FirebaseMessagingException {
     // [START send_multicast]
-    // Create a list containing up to 100 registration tokens.
+    // Create a list containing up to 500 registration tokens.
     // These registration tokens come from the client FCM SDKs.
     List<String> registrationTokens = Arrays.asList(
         "YOUR_REGISTRATION_TOKEN_1",
@@ -192,6 +229,36 @@ public class FirebaseMessagingSnippets {
       System.out.println("List of tokens that caused failures: " + failedTokens);
     }
     // [END send_multicast_error]
+  }
+
+  public void sendEachForMulticastAndHandleErrors() throws FirebaseMessagingException {
+    // [START send_each_for_multicast_error]
+    // These registration tokens come from the client FCM SDKs.
+    List<String> registrationTokens = Arrays.asList(
+        "YOUR_REGISTRATION_TOKEN_1",
+        // ...
+        "YOUR_REGISTRATION_TOKEN_n"
+    );
+
+    MulticastMessage message = MulticastMessage.builder()
+        .putData("score", "850")
+        .putData("time", "2:45")
+        .addAllTokens(registrationTokens)
+        .build();
+    BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
+    if (response.getFailureCount() > 0) {
+      List<SendResponse> responses = response.getResponses();
+      List<String> failedTokens = new ArrayList<>();
+      for (int i = 0; i < responses.size(); i++) {
+        if (!responses.get(i).isSuccessful()) {
+          // The order of responses corresponds to the order of the registration tokens.
+          failedTokens.add(registrationTokens.get(i));
+        }
+      }
+
+      System.out.println("List of tokens that caused failures: " + failedTokens);
+    }
+    // [END send_each_for_multicast_error]
   }
 
   public Message androidMessage() {
@@ -251,9 +318,10 @@ public class FirebaseMessagingSnippets {
   public Message allPlatformsMessage() {
     // [START multi_platforms_message]
     Message message = Message.builder()
-        .setNotification(new Notification(
-            "$GOOG up 1.43% on the day",
-            "$GOOG gained 11.80 points to close at 835.67, up 1.43% on the day."))
+        .setNotification(Notification.builder()
+            .setTitle("$GOOG up 1.43% on the day")
+            .setBody("$GOOG gained 11.80 points to close at 835.67, up 1.43% on the day.")
+            .build())
         .setAndroidConfig(AndroidConfig.builder()
             .setTtl(3600 * 1000)
             .setNotification(AndroidNotification.builder()

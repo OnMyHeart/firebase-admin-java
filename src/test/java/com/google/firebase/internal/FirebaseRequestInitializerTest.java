@@ -38,6 +38,7 @@ public class FirebaseRequestInitializerTest {
   private static final int MAX_RETRIES = 5;
   private static final int CONNECT_TIMEOUT_MILLIS = 30000;
   private static final int READ_TIMEOUT_MILLIS = 60000;
+  private static final int WRITE_TIMEOUT_MILLIS = 90000;
 
   @After
   public void tearDown() {
@@ -46,7 +47,7 @@ public class FirebaseRequestInitializerTest {
 
   @Test
   public void testDefaultSettings() throws Exception {
-    FirebaseApp app = FirebaseApp.initializeApp(new FirebaseOptions.Builder()
+    FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder()
         .setCredentials(new MockGoogleCredentials("token"))
         .build());
     HttpRequest request = TestUtils.createRequest();
@@ -65,10 +66,11 @@ public class FirebaseRequestInitializerTest {
 
   @Test
   public void testExplicitTimeouts() throws Exception {
-    FirebaseApp app = FirebaseApp.initializeApp(new FirebaseOptions.Builder()
+    FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder()
         .setCredentials(new MockGoogleCredentials("token"))
         .setConnectTimeout(CONNECT_TIMEOUT_MILLIS)
         .setReadTimeout(READ_TIMEOUT_MILLIS)
+        .setWriteTimeout(WRITE_TIMEOUT_MILLIS)
         .build());
     HttpRequest request = TestUtils.createRequest();
 
@@ -77,6 +79,7 @@ public class FirebaseRequestInitializerTest {
 
     assertEquals(CONNECT_TIMEOUT_MILLIS, request.getConnectTimeout());
     assertEquals(READ_TIMEOUT_MILLIS, request.getReadTimeout());
+    assertEquals(WRITE_TIMEOUT_MILLIS, request.getWriteTimeout());
     assertEquals("Bearer token", request.getHeaders().getAuthorization());
     assertEquals(HttpRequest.DEFAULT_NUMBER_OF_RETRIES, request.getNumberOfRetries());
     assertNull(request.getIOExceptionHandler());
@@ -85,7 +88,7 @@ public class FirebaseRequestInitializerTest {
 
   @Test
   public void testRetryConfig() throws Exception {
-    FirebaseApp app = FirebaseApp.initializeApp(new FirebaseOptions.Builder()
+    FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder()
         .setCredentials(new MockGoogleCredentials("token"))
         .build());
     RetryConfig retryConfig = RetryConfig.builder()
@@ -106,7 +109,7 @@ public class FirebaseRequestInitializerTest {
 
   @Test
   public void testRetryConfigWithIOExceptionHandling() throws Exception {
-    FirebaseApp app = FirebaseApp.initializeApp(new FirebaseOptions.Builder()
+    FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder()
         .setCredentials(new MockGoogleCredentials("token"))
         .build());
     RetryConfig retryConfig = RetryConfig.builder()
@@ -128,7 +131,7 @@ public class FirebaseRequestInitializerTest {
 
   @Test
   public void testCredentialsRetryHandler() throws Exception {
-    FirebaseApp app = FirebaseApp.initializeApp(new FirebaseOptions.Builder()
+    FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder()
         .setCredentials(new MockGoogleCredentials("token"))
         .build());
     RetryConfig retryConfig = RetryConfig.builder()

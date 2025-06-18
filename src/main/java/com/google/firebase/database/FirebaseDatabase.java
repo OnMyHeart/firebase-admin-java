@@ -35,6 +35,7 @@ import com.google.firebase.database.util.EmulatorHelper;
 import com.google.firebase.database.utilities.ParsedUrl;
 import com.google.firebase.database.utilities.Utilities;
 import com.google.firebase.database.utilities.Validation;
+import com.google.firebase.internal.EmulatorCredentials;
 import com.google.firebase.internal.FirebaseService;
 
 import com.google.firebase.internal.SdkUtils;
@@ -173,7 +174,7 @@ public class FirebaseDatabase {
     return db;
   }
 
-  /** 
+  /**
    * @return The version for this build of the Firebase Database client
    */
   public static String getSdkVersion() {
@@ -358,6 +359,10 @@ public class FirebaseDatabase {
     return this.config;
   }
 
+  /**
+   * Tears down the WebSocket connections and background threads started by this {@code
+   * FirebaseDatabase} instance thus disconnecting from the remote database.
+   */
   void destroy() {
     synchronized (lock) {
       if (destroyed.get()) {
@@ -400,28 +405,6 @@ public class FirebaseDatabase {
     @Override
     public void destroy() {
       instance.destroy();
-    }
-  }
-
-  private static class EmulatorCredentials extends GoogleCredentials {
-
-    EmulatorCredentials() {
-      super(newToken());
-    }
-
-    private static AccessToken newToken() {
-      return new AccessToken("owner",
-          new Date(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1)));
-    }
-
-    @Override
-    public AccessToken refreshAccessToken() {
-      return newToken();
-    }
-
-    @Override
-    public Map<String, List<String>> getRequestMetadata() throws IOException {
-      return ImmutableMap.of();
     }
   }
 }

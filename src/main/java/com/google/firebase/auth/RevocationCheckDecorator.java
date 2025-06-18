@@ -20,30 +20,27 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.base.Strings;
+import com.google.firebase.ErrorCode;
 
 /**
  * A decorator for adding token revocation checks to an existing {@link FirebaseTokenVerifier}.
  */
 class RevocationCheckDecorator implements FirebaseTokenVerifier {
 
-  static final String ID_TOKEN_REVOKED_ERROR = "id-token-revoked";
-  static final String SESSION_COOKIE_REVOKED_ERROR = "session-cookie-revoked";
-
   private final FirebaseTokenVerifier tokenVerifier;
   private final FirebaseUserManager userManager;
-  private final String errorCode;
+  private final AuthErrorCode errorCode;
   private final String shortName;
 
   private RevocationCheckDecorator(
       FirebaseTokenVerifier tokenVerifier,
       FirebaseUserManager userManager,
-      String errorCode,
+      AuthErrorCode errorCode,
       String shortName) {
     this.tokenVerifier = checkNotNull(tokenVerifier);
     this.userManager = checkNotNull(userManager);
-    checkArgument(!Strings.isNullOrEmpty(errorCode));
+    this.errorCode = checkNotNull(errorCode);
     checkArgument(!Strings.isNullOrEmpty(shortName));
-    this.errorCode = errorCode;
     this.shortName = shortName;
   }
 
@@ -54,27 +51,39 @@ class RevocationCheckDecorator implements FirebaseTokenVerifier {
   @Override
   public FirebaseToken verifyToken(String token) throws FirebaseAuthException {
     FirebaseToken firebaseToken = tokenVerifier.verifyToken(token);
-    if (isRevoked(firebaseToken)) {
-      throw new FirebaseAuthException(errorCode, "Firebase " + shortName + " revoked");
-    }
+    validateDisabledOrRevoked(firebaseToken);
     return firebaseToken;
   }
 
-  private boolean isRevoked(FirebaseToken firebaseToken) throws FirebaseAuthException {
+  private void validateDisabledOrRevoked(FirebaseToken firebaseToken) throws FirebaseAuthException {
     UserRecord user = userManager.getUserById(firebaseToken.getUid());
+    if (user.isDisabled()) {
+      throw new FirebaseAuthException(ErrorCode.INVALID_ARGUMENT,
+          "The user record is disabled.",
+          /* cause= */ null,
+          /* response= */ null,
+          AuthErrorCode.USER_DISABLED);
+    }
     long issuedAtInSeconds = (long) firebaseToken.getClaims().get("iat");
-    return user.getTokensValidAfterTimestamp() > issuedAtInSeconds * 1000;
+    if (user.getTokensValidAfterTimestamp() > issuedAtInSeconds * 1000) {
+      throw new FirebaseAuthException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Firebase " + shortName + " is revoked.",
+          null,
+          null,
+          errorCode);
+    }
   }
 
   static RevocationCheckDecorator decorateIdTokenVerifier(
       FirebaseTokenVerifier tokenVerifier, FirebaseUserManager userManager) {
     return new RevocationCheckDecorator(
-        tokenVerifier, userManager, ID_TOKEN_REVOKED_ERROR, "id token");
+        tokenVerifier, userManager, AuthErrorCode.REVOKED_ID_TOKEN, "id token");
   }
 
   static RevocationCheckDecorator decorateSessionCookieVerifier(
       FirebaseTokenVerifier tokenVerifier, FirebaseUserManager userManager) {
     return new RevocationCheckDecorator(
-        tokenVerifier, userManager, SESSION_COOKIE_REVOKED_ERROR, "session cookie");
+        tokenVerifier, userManager, AuthErrorCode.REVOKED_SESSION_COOKIE, "session cookie");
   }
 }

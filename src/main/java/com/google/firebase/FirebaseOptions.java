@@ -19,7 +19,6 @@ package com.google.firebase;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.api.client.googleapis.util.Utils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.util.Key;
@@ -29,6 +28,8 @@ import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
+import com.google.firebase.internal.ApiClientUtils;
+import com.google.firebase.internal.ApplicationDefaultCredentialsProvider;
 import com.google.firebase.internal.FirebaseThreadManagers;
 import com.google.firebase.internal.NonNull;
 import com.google.firebase.internal.Nullable;
@@ -64,7 +65,8 @@ public final class FirebaseOptions {
         @Override
         public GoogleCredentials get() {
           try {
-            return GoogleCredentials.getApplicationDefault().createScoped(FIREBASE_SCOPES);
+            return ApplicationDefaultCredentialsProvider.getApplicationDefault()
+                .createScoped(FIREBASE_SCOPES);
           } catch (IOException e) {
             throw new IllegalStateException(e);
           }
@@ -80,6 +82,7 @@ public final class FirebaseOptions {
   private final HttpTransport httpTransport;
   private final int connectTimeout;
   private final int readTimeout;
+  private final int writeTimeout;
   private final JsonFactory jsonFactory;
   private final ThreadManager threadManager;
   private final FirestoreOptions firestoreOptions;
@@ -100,16 +103,18 @@ public final class FirebaseOptions {
       this.serviceAccountId = null;
     }
     this.storageBucket = builder.storageBucket;
-    this.httpTransport = checkNotNull(builder.httpTransport,
-        "FirebaseOptions must be initialized with a non-null HttpTransport.");
-    this.jsonFactory = checkNotNull(builder.jsonFactory,
-        "FirebaseOptions must be initialized with a non-null JsonFactory.");
-    this.threadManager = checkNotNull(builder.threadManager,
-        "FirebaseOptions must be initialized with a non-null ThreadManager.");
+    this.httpTransport = builder.httpTransport != null ? builder.httpTransport
+      : ApiClientUtils.getDefaultTransport();
+    this.jsonFactory = builder.jsonFactory != null ? builder.jsonFactory
+      : ApiClientUtils.getDefaultJsonFactory();
+    this.threadManager = builder.threadManager != null ? builder.threadManager
+      : FirebaseThreadManagers.DEFAULT_THREAD_MANAGER;
     checkArgument(builder.connectTimeout >= 0);
     this.connectTimeout = builder.connectTimeout;
     checkArgument(builder.readTimeout >= 0);
     this.readTimeout = builder.readTimeout;
+    checkArgument(builder.writeTimeout >= 0);
+    this.writeTimeout = builder.writeTimeout;
     this.firestoreOptions = builder.firestoreOptions;
   }
 
@@ -196,13 +201,21 @@ public final class FirebaseOptions {
   }
 
   /**
-   * Returns the read timeout in milliseconds, which is applied to outgoing REST calls
-   * made by the SDK.
+   * Returns the read timeout applied to outgoing REST calls in milliseconds.
    *
    * @return Read timeout in milliseconds. 0 indicates an infinite timeout.
    */
   public int getReadTimeout() {
     return readTimeout;
+  }
+
+  /**
+   * Returns the write timeout applied to outgoing REST calls in milliseconds.
+   *
+   * @return Write timeout in milliseconds. 0 indicates an infinite timeout.
+   */
+  public int getWriteTimeout() {
+    return writeTimeout;
   }
 
   @NonNull
@@ -224,18 +237,28 @@ public final class FirebaseOptions {
   }
 
   /**
-   * Builder for constructing {@link FirebaseOptions}. 
+   * Creates a new {@code Builder} from the options object.
+   *
+   * <p>The new builder is not backed by this object's values; that is, changes made to the new
+   * builder don't change the values of the origin object.
+   */
+  public Builder toBuilder() {
+    return new Builder(this);
+  }
+
+  /**
+   * Builder for constructing {@link FirebaseOptions}.
    */
   public static final class Builder {
     @Key("databaseAuthVariableOverride")
     private Map<String, Object> databaseAuthVariableOverride = new HashMap<>();
-    
+
     @Key("databaseUrl")
     private String databaseUrl;
 
     @Key("projectId")
     private String projectId;
-    
+
     @Key("storageBucket")
     private String storageBucket;
 
@@ -243,13 +266,19 @@ public final class FirebaseOptions {
     private String serviceAccountId;
     private Supplier<GoogleCredentials> credentialsSupplier;
     private FirestoreOptions firestoreOptions;
-    private HttpTransport httpTransport = Utils.getDefaultTransport();
-    private JsonFactory jsonFactory = Utils.getDefaultJsonFactory();
-    private ThreadManager threadManager = FirebaseThreadManagers.DEFAULT_THREAD_MANAGER;
+    private HttpTransport httpTransport;
+    private JsonFactory jsonFactory;
+    private ThreadManager threadManager;
     private int connectTimeout;
     private int readTimeout;
+    private int writeTimeout;
 
-    /** Constructs an empty builder. */
+    /**
+     * Constructs an empty builder.
+     *
+     * @deprecated Use {@link FirebaseOptions#builder()} instead.
+     */
+    @Deprecated
     public Builder() {}
 
     /**
@@ -257,7 +286,10 @@ public final class FirebaseOptions {
      *
      * <p>The new builder is not backed by this object's values, that is changes made to the new
      * builder don't change the values of the origin object.
+     *
+     * @deprecated Use {@link FirebaseOptions#toBuilder()} instead.
      */
+    @Deprecated
     public Builder(FirebaseOptions options) {
       databaseUrl = options.databaseUrl;
       storageBucket = options.storageBucket;
@@ -269,6 +301,7 @@ public final class FirebaseOptions {
       threadManager = options.threadManager;
       connectTimeout = options.connectTimeout;
       readTimeout = options.readTimeout;
+      writeTimeout = options.writeTimeout;
       firestoreOptions = options.firestoreOptions;
     }
 
@@ -401,7 +434,8 @@ public final class FirebaseOptions {
      * @return This <code>Builder</code> instance is returned so subsequent calls can be chained.
      */
     public Builder setHttpTransport(HttpTransport httpTransport) {
-      this.httpTransport = httpTransport;
+      this.httpTransport = checkNotNull(httpTransport,
+          "FirebaseOptions must be initialized with a non-null HttpTransport.");
       return this;
     }
 
@@ -413,7 +447,8 @@ public final class FirebaseOptions {
      * @return This <code>Builder</code> instance is returned so subsequent calls can be chained.
      */
     public Builder setJsonFactory(JsonFactory jsonFactory) {
-      this.jsonFactory = jsonFactory;
+      this.jsonFactory = checkNotNull(jsonFactory,
+            "FirebaseOptions must be initialized with a non-null JsonFactory.");
       return this;
     }
 
@@ -425,7 +460,8 @@ public final class FirebaseOptions {
      * @return This <code>Builder</code> instance is returned so subsequent calls can be chained.
      */
     public Builder setThreadManager(ThreadManager threadManager) {
-      this.threadManager = threadManager;
+      this.threadManager = checkNotNull(threadManager,
+            "FirebaseOptions must be initialized with a non-null ThreadManager.");
       return this;
     }
 
@@ -469,6 +505,19 @@ public final class FirebaseOptions {
      */
     public Builder setReadTimeout(int readTimeout) {
       this.readTimeout = readTimeout;
+      return this;
+    }
+
+    /**
+     * Sets the write timeout for outgoing HTTP (REST) calls made by the SDK. This does not affect
+     * the {@link com.google.firebase.database.FirebaseDatabase} and
+     * {@link com.google.firebase.cloud.FirestoreClient} APIs.
+     *
+     * @param writeTimeout Write timeout in milliseconds. Must not be negative.
+     * @return This <code>Builder</code> instance is returned so subsequent calls can be chained.
+     */
+    public Builder setWriteTimeout(int writeTimeout) {
+      this.writeTimeout = writeTimeout;
       return this;
     }
 
